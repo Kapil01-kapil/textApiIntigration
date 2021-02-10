@@ -1,114 +1,99 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
+//Imports
+import React, { Component } from 'react';
+import StackNavigation from './src/navigation/stack_navigation';
+import { Provider } from 'react-redux';
+import configureStore from './src/redux/store';
+import { PersistGate } from 'redux-persist/integration/react'
+import { persistStore } from 'redux-persist';
+import { Platform } from 'react-native';
+import firebase from 'react-native-firebase';
 
-import React from 'react';
-import {
-  SafeAreaView,
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-  StatusBar,
-} from 'react-native';
+import stripe from 'tipsi-stripe'
 
-import {
-  Header,
-  LearnMoreLinks,
-  Colors,
-  DebugInstructions,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+stripe.setOptions({
+  publishableKey: 'pk_test_AUrE92WoAMzjQEn4fThEEkzR',
+  merchantId: 'merchant.com.ezfill',
+  androidPayMode: 'test',
+})
 
-const App: () => React$Node = () => {
-  return (
-    <>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaView>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          style={styles.scrollView}>
-          <Header />
-          {global.HermesInternal == null ? null : (
-            <View style={styles.engine}>
-              <Text style={styles.footer}>Engine: Hermes</Text>
-            </View>
-          )}
-          <View style={styles.body}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Step One</Text>
-              <Text style={styles.sectionDescription}>
-                Edit <Text style={styles.highlight}>App.js</Text> to change this
-                screen and then come back to see your edits.
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>See Your Changes</Text>
-              <Text style={styles.sectionDescription}>
-                <ReloadInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Debug</Text>
-              <Text style={styles.sectionDescription}>
-                <DebugInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Learn More</Text>
-              <Text style={styles.sectionDescription}>
-                Read the docs to discover what to do next:
-              </Text>
-            </View>
-            <LearnMoreLinks />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
-  );
-};
+const store = configureStore()
+let persistor = persistStore(store)
 
-const styles = StyleSheet.create({
-  scrollView: {
-    backgroundColor: Colors.lighter,
-  },
-  engine: {
-    position: 'absolute',
-    right: 0,
-  },
-  body: {
-    backgroundColor: Colors.white,
-  },
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.black,
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-    color: Colors.dark,
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-  footer: {
-    color: Colors.dark,
-    fontSize: 12,
-    fontWeight: '600',
-    padding: 4,
-    paddingRight: 12,
-    textAlign: 'right',
-  },
-});
+//Main Class
+export default class App extends Component {
 
-export default App;
+  componentDidMount() {
+    const channel = new firebase.notifications.Android.Channel(
+      'channelId',
+      'Channel Name',
+      firebase.notifications.Android.Importance.Max
+    ).setDescription('A natural description of the channel');
+    firebase.notifications().android.createChannel(channel);
+    this.notificationListener = firebase.notifications().onNotification((notification) => {
+      if (Platform.OS === 'android') {
+    
+        const localNotification = new firebase.notifications.Notification({
+            soundName: 'default',
+            show_in_foreground: true,
+          })
+          .android.setVibrate([1000, 1000])
+          .android.setDefaults([firebase.notifications.Android.Defaults.Vibrate])
+          .setNotificationId(notification.notificationId)
+          .setTitle(notification.title)
+          .setSubtitle(notification.subtitle)
+          .setBody(notification.body)
+          .setData(notification.data)
+          .android.setChannelId('channelId') // e.g. the id you chose above
+          .android.setSmallIcon('ic_launcher') // create this icon in Android Studio
+          .android.setColor('#ffffff') // you can set a color here
+          .android.setPriority(firebase.notifications.Android.Priority.High);
+     
+        firebase.notifications()
+          .displayNotification(localNotification)
+          .catch(
+            err => 
+            console.error(err)
+            );
+    
+      } else if (Platform.OS === 'ios') {
+    
+        const localNotification = new firebase.notifications.Notification()
+          .setNotificationId(notification.notificationId)
+          .setTitle(notification.title)
+          .setSubtitle(notification.subtitle)
+          .setBody(notification.body)
+          .setData(notification.data)
+          .ios.setBadge(notification.ios.badge);
+    
+        firebase.notifications()
+          .displayNotification(localNotification)
+          .catch(err => console.error(err));
+    
+      }
+    });
+    }
+    
+    componentWillUnmount() {
+    // this is where you unsubscribe notification listner
+    this.notificationListener();
+    }
+    
+
+  render() {
+
+    return (
+      // <Provider store={store}>
+      //   <StackNavigation />
+      // </Provider>
+
+      <Provider store={store}>
+
+        <PersistGate loading={null} persistor={persistor}>
+          <StackNavigation />
+        </PersistGate>
+      </Provider>
+
+    );
+  }
+}
+
